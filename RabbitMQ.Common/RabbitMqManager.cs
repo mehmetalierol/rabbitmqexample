@@ -6,10 +6,12 @@ namespace RabbitMQ.Common
     {
         public string? CurrentEndPoint { get; private set; }
 
-        private readonly ConnectionFactory factory = new() { UserName = "admin", Password = "123456" };
+        private readonly ConnectionFactory factory = new() { UserName = "admin", Password = "123456", AutomaticRecoveryEnabled = false };
 
         private readonly List<AmqpTcpEndpoint> listHostnames = new()
         {
+            new AmqpTcpEndpoint("127.0.0.1", 5668),
+            new AmqpTcpEndpoint("127.0.0.1", 5669),
             new AmqpTcpEndpoint("127.0.0.1", 5670),
             new AmqpTcpEndpoint("127.0.0.1", 5671),
             new AmqpTcpEndpoint("127.0.0.1", 5672)
@@ -17,9 +19,18 @@ namespace RabbitMQ.Common
 
         public IModel? CreateConnection()
         {
-            var connection = factory.CreateConnection(listHostnames);
+            factory.RequestedConnectionTimeout = TimeSpan.FromSeconds(5);
+
+            IConnection connection;
+            do
+            {
+                connection = factory.CreateConnection(listHostnames);
+                break;
+            } while (true);
+            
             var channel = connection.CreateModel();
             CurrentEndPoint = connection.Endpoint.HostName + ":" + connection.Endpoint.Port.ToString();
+
             var queueArgs = new Dictionary<string, object>
             {
                 { "x-queue-type", "quorum" }
